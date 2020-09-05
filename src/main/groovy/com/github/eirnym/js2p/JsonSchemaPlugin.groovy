@@ -32,7 +32,7 @@ class JsonSchemaPlugin implements Plugin<Project> {
     public void apply(Project project) {
         project.extensions.create('jsonSchema2Pojo', JsonSchemaExtension)
 
-        project.pluginManager.withPlugin('java-base', {
+        project.pluginManager.withPlugin('java', {
             project.tasks.register('generateJsonSchema2Pojo', GenerateJsonSchemaJavaTask)
             initialized = true
         })
