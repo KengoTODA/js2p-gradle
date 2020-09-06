@@ -17,7 +17,14 @@ package com.github.eirnym.js2p
 
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.FileCollection
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import org.jsonschema2pojo.GenerationConfig
 import org.jsonschema2pojo.Jsonschema2Pojo
@@ -28,49 +35,48 @@ import org.jsonschema2pojo.Jsonschema2Pojo
  * @author Ben Manes (ben.manes@gmail.com)
  */
 class GenerateJsonSchemaJavaTask extends DefaultTask {
-    @Internal
-    GenerationConfig configuration
+    @OutputDirectory
+    final DirectoryProperty targetDirectory
+
+    @InputFiles
+    final ConfigurableFileCollection sourceFiles
+
+    @Input
+    String getConfiguration() {
+        def extension = project.extensions.getByType(JsonSchemaExtension)
+        return extension.toString()
+    }
 
     GenerateJsonSchemaJavaTask() {
         description = 'Generates Java classes from a json schema.'
         group = 'Build'
 
-        project.afterEvaluate {
-            configuration = project.jsonSchema2Pojo
-            configuration.targetDirectory = configuration.targetDirectory ?:
-                    project.file("${project.buildDir}/generated-sources/js2p")
+        def extension = project.extensions.getByType(JsonSchemaExtension)
+        targetDirectory = extension.getTargetDirectoryProperty().convention(project.layout.buildDirectory.dir("generated-sources/js2p"))
+        sourceFiles = extension.sourceFiles
 
-            if (project.plugins.hasPlugin('java')) {
-                configureJava()
-            } else {
-                throw new GradleException('generateJsonSchema: Java plugin is required')
-            }
-            outputs.dir configuration.targetDirectory
-
-            inputs.property("configuration", configuration.toString())
-            inputs.files project.files(configuration.sourceFiles)
-        }
+        configureJava(extension)
     }
 
-    def configureJava() {
-        project.sourceSets.main.java.srcDirs += [configuration.targetDirectory]
-        dependsOn(project.tasks.processResources)
-        project.tasks.compileJava.dependsOn(this)
+    def configureJava(JsonSchemaExtension extension) {
+        project.sourceSets.main.java.srcDirs += [extension.targetDirectory]
+        dependsOn(project.tasks.named("processResources"))
+        project.tasks.named("compileJava").configure({ it.dependsOn(this) })
 
-        if (!configuration.source.hasNext()) {
-            configuration.source = project.files("${project.sourceSets.main.output.resourcesDir}/json")
-            configuration.sourceFiles.each { it.mkdir() }
+        if (!extension.source.hasNext()) {
+            extension.source = project.files("${project.sourceSets.main.output.resourcesDir}/json")
+            extension.sourceFiles.each { it.mkdir() }
         }
     }
 
     @TaskAction
     def generate() {
-        if (Boolean.TRUE == configuration.properties.get("useCommonsLang3")) {
+        def extension = project.extensions.getByType(JsonSchemaExtension)
+        if (extension.useCommonsLang3) {
             logger.warn 'useCommonsLang3 is deprecated. Please remove it from your config.'
         }
 
-        logger.info 'Using this configuration:\n{}', configuration
-
-        Jsonschema2Pojo.generate(configuration, new GradleRuleLogger(logger))
+        logger.info 'Using this configuration:\n{}', extension
+        Jsonschema2Pojo.generate(extension, new GradleRuleLogger(logger))
     }
 }

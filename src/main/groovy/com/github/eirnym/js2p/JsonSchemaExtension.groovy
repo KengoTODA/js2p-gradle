@@ -15,6 +15,11 @@
  */
 package com.github.eirnym.js2p
 
+import org.gradle.api.Project
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.FileCollection
+import org.gradle.api.model.ObjectFactory
 import org.jsonschema2pojo.AnnotationStyle
 import org.jsonschema2pojo.Annotator
 import org.jsonschema2pojo.AllFileFilter
@@ -26,6 +31,8 @@ import org.jsonschema2pojo.SourceSortOrder
 import org.jsonschema2pojo.SourceType
 import org.jsonschema2pojo.rules.RuleFactory
 
+import javax.inject.Inject
+
 /**
  * The configuration properties.
  *
@@ -33,8 +40,8 @@ import org.jsonschema2pojo.rules.RuleFactory
  * @see https://github.com/joelittlejohn/jsonschema2pojo
  */
 public class JsonSchemaExtension implements GenerationConfig {
-  Iterable<File> sourceFiles
-  File targetDirectory
+  ConfigurableFileCollection sourceFiles
+  DirectoryProperty targetDirectory
   String targetPackage
   AnnotationStyle annotationStyle
   boolean useTitleAsClassname
@@ -98,13 +105,14 @@ public class JsonSchemaExtension implements GenerationConfig {
   Language targetLanguage
   Map<String, String> formatTypeMapping
 
-  public JsonSchemaExtension() {
+  @Inject
+  public JsonSchemaExtension(ObjectFactory objects) {
     // See DefaultGenerationConfig
     generateBuilders = false
     includeJsonTypeInfoAnnotation = false
     useInnerClassBuilders = false
     usePrimitives = false
-    sourceFiles = []
+    sourceFiles = objects.fileCollection()
     targetPackage = ''
     propertyWordDelimiters = ['-', ' ', '_'] as char[]
     useLongIntegers = false
@@ -156,6 +164,7 @@ public class JsonSchemaExtension implements GenerationConfig {
     refFragmentPathDelimiters = "#/."
     sourceSortOrder = SourceSortOrder.OS
     formatTypeMapping = Collections.emptyMap()
+    targetDirectory = objects.directoryProperty()
   }
 
   @Override
@@ -170,17 +179,11 @@ public class JsonSchemaExtension implements GenerationConfig {
 
   @Override
   public Iterator<URL> getSource() {
-    def urlList = []
-    for (source in sourceFiles) {
-      urlList.add(source.toURI().toURL())
-    }
-    urlList.iterator()
+    sourceFiles.collect{it.toURI().toURL()}.iterator()
   }
 
-  public void setSource(Iterable<File> files) {
-    def copy = [] as List
-    files.each { copy.add(it) }
-    sourceFiles = copy
+  public void setSource(FileCollection files) {
+    sourceFiles.setFrom(files)
   }
 
   public void setAnnotationStyle(String style) {
@@ -292,4 +295,12 @@ public class JsonSchemaExtension implements GenerationConfig {
     return formatDateTimes
   }
 
+  @Override
+  File getTargetDirectory() {
+    return targetDirectory.get().asFile
+  }
+
+  DirectoryProperty getTargetDirectoryProperty() {
+    return targetDirectory;
+  }
 }

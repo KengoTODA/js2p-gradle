@@ -26,14 +26,19 @@ import org.gradle.api.Project
  * @author Ben Manes (ben.manes@gmail.com)
  */
 class JsonSchemaPlugin implements Plugin<Project> {
+    boolean initialized = false
 
     @Override
     public void apply(Project project) {
         project.extensions.create('jsonSchema2Pojo', JsonSchemaExtension)
+
+        project.pluginManager.withPlugin('java', {
+            project.tasks.register('generateJsonSchema2Pojo', GenerateJsonSchemaJavaTask)
+            initialized = true
+        })
+
         project.afterEvaluate {
-            if (project.plugins.hasPlugin('java')) {
-                project.tasks.create('generateJsonSchema2Pojo', GenerateJsonSchemaJavaTask)
-            } else if (project.plugins.hasPlugin('com.android.application') || project.plugins.hasPlugin('com.android.library')) {
+            if (project.plugins.hasPlugin('com.android.application') || project.plugins.hasPlugin('com.android.library')) {
                 def config = project.jsonSchema2Pojo
                 def variants = null
                 if (project.android.hasProperty('applicationVariants')) {
@@ -53,7 +58,7 @@ class JsonSchemaPlugin implements Plugin<Project> {
 
                     variant.registerJavaGeneratingTask(task, (File) task.outputDir)
                 }
-            } else {
+            } else if (!initialized) {
                 for (Plugin<?> plugin : project.plugins) {
                     project.logger.error(plugin.class.name);
                 }
